@@ -49,10 +49,10 @@
 
     #result {
       margin-top: 25px;
-      min-height: 100px;
+      min-height: 120px;
       padding: 20px;
       border-radius: 18px;
-      font-size: 26px;
+      font-size: 24px;
       font-weight: bold;
       background: #222;
     }
@@ -61,9 +61,29 @@
       color: white;
     }
 
-    .success {
+    .active {
       background: #d9f2df !important;
       color: #137333;
+    }
+
+    .warning {
+      background: #fff3cd !important;
+      color: #8a6100;
+    }
+
+    .expired {
+      background: #f8d7da !important;
+      color: #b3261e;
+    }
+
+    .neutral {
+      background: #e5e5e5 !important;
+      color: #444;
+    }
+
+    .error {
+      background: #f8d7da !important;
+      color: #b3261e;
     }
   </style>
 </head>
@@ -79,9 +99,7 @@
       Δείξε το προσωπικό σου QR στην κάμερα
     </div>
 
-
     <div id="reader"></div>
-
 
     <div id="result" class="ready">
       Έτοιμο για σκανάρισμα
@@ -92,49 +110,137 @@
 
 <script>
 
+const WEB_APP_URL =
+  "https://script.google.com/macros/s/AKfycbzYyKLJny_LTBuM6W048O1KdF064-XxBfKzsmgSj3akPj8exZIMWOMYs-rzk2_siq3t/exec";
+
 let lastCode = "";
 let lastScanTime = 0;
+let busy = false;
 
 
-function onScanSuccess(decodedText) {
+async function onScanSuccess(decodedText) {
 
+  const id = decodedText.trim();
   const now = Date.now();
 
+  if (!id) return;
 
-  // Αποφεύγουμε συνεχόμενα scans
-  // του ίδιου QR σε πολύ μικρό χρονικό διάστημα.
+  // Αποφεύγουμε διπλό scan του ίδιου QR
   if (
-    decodedText === lastCode &&
+    id === lastCode &&
     now - lastScanTime < 5000
   ) {
     return;
   }
 
+  if (busy) return;
 
-  lastCode = decodedText;
+  busy = true;
+  lastCode = id;
   lastScanTime = now;
-
 
   const result =
     document.getElementById("result");
 
-
-  result.className = "success";
-
-  result.innerHTML =
-    "✅ QR ΔΙΑΒΑΣΤΗΚΕ<br><br>" +
-    "ID: " +
-    decodedText;
+  result.className = "ready";
+  result.innerHTML = "⏳ Καταγραφή παρουσίας...";
 
 
-  // Μετά από 3 δευτερόλεπτα
-  // η οθόνη ξαναδείχνει READY.
+  try {
+
+    const response = await fetch(
+      WEB_APP_URL + "?id=" + encodeURIComponent(id)
+    );
+
+    const html = await response.text();
+
+    // Παίρνουμε μόνο το ορατό κείμενο από την HTML του Apps Script
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+
+    const pageText =
+      doc.body.innerText || "";
+
+    let name = "";
+    let status = "";
+    let message = "";
+
+    // Προσπαθούμε να βρούμε το όνομα
+    const nameEl =
+      doc.querySelector(".name");
+
+    if (nameEl) {
+      name = nameEl.innerText.trim();
+    }
+
+    // Προσπαθούμε να βρούμε το status
+    const statusEl =
+      doc.querySelector(".status");
+
+    if (statusEl) {
+      status = statusEl.innerText.trim();
+    }
+
+    // Προσπαθούμε να βρούμε το μήνυμα
+    const messageEl =
+      doc.querySelector(".message");
+
+    if (messageEl) {
+      message = messageEl.innerText.trim();
+    }
+
+
+    if (!name && !status) {
+      result.className = "error";
+      result.innerHTML =
+        "❌ Δεν μπόρεσα να διαβάσω τα στοιχεία του μαθητή.";
+    } else {
+
+      let cssClass = "neutral";
+
+      const s =
+        status.toUpperCase();
+
+      if (s === "ΕΝΕΡΓΟΣ") {
+        cssClass = "active";
+      }
+      else if (s === "ΛΗΓΕΙ ΣΥΝΤΟΜΑ") {
+        cssClass = "warning";
+      }
+      else if (s === "ΕΛΗΞΕ") {
+        cssClass = "expired";
+      }
+
+      result.className = cssClass;
+
+      result.innerHTML =
+        "✅ " + (message || "Παρουσία καταγράφηκε") +
+        "<br><br>" +
+        name +
+        "<br><br>" +
+        status;
+    }
+
+  }
+  catch (err) {
+
+    result.className = "error";
+
+    result.innerHTML =
+      "❌ Σφάλμα σύνδεσης με το σύστημα.";
+
+  }
+
+
+  // Μετά από 3 δευτερόλεπτα ξανά ready
   setTimeout(function() {
 
     result.className = "ready";
 
     result.innerHTML =
       "Έτοιμο για σκανάρισμα";
+
+    busy = false;
 
   }, 3000);
 
@@ -143,10 +249,7 @@ function onScanSuccess(decodedText) {
 
 
 function onScanFailure(error) {
-
-  // Δεν κάνουμε τίποτα.
-  // Ο scanner συνεχίζει να ψάχνει QR.
-
+  // Ο scanner συνεχίζει κανονικά.
 }
 
 
