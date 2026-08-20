@@ -3,8 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>QR Check-in</title>
 
@@ -49,7 +48,7 @@
 
     #result {
       margin-top: 25px;
-      min-height: 120px;
+      min-height: 130px;
       padding: 20px;
       border-radius: 18px;
       font-size: 24px;
@@ -85,9 +84,14 @@
       background: #f8d7da !important;
       color: #b3261e;
     }
+
+    .small {
+      margin-top: 12px;
+      font-size: 17px;
+      font-weight: normal;
+    }
   </style>
 </head>
-
 
 <body>
 
@@ -107,15 +111,14 @@
 
   </div>
 
-
 <script>
 
 const WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbzYyKLJny_LTBuM6W048O1KdF064-XxBfKzsmgSj3akPj8exZIMWOMYs-rzk2_siq3t/exec";
 
+let busy = false;
 let lastCode = "";
 let lastScanTime = 0;
-let busy = false;
 
 
 async function onScanSuccess(decodedText) {
@@ -123,9 +126,11 @@ async function onScanSuccess(decodedText) {
   const id = decodedText.trim();
   const now = Date.now();
 
-  if (!id) return;
+  if (!id) {
+    return;
+  }
 
-  // Αποφεύγουμε διπλό scan του ίδιου QR
+  // Αποφυγή συνεχόμενου διπλού scan
   if (
     id === lastCode &&
     now - lastScanTime < 5000
@@ -133,7 +138,9 @@ async function onScanSuccess(decodedText) {
     return;
   }
 
-  if (busy) return;
+  if (busy) {
+    return;
+  }
 
   busy = true;
   lastCode = id;
@@ -149,90 +156,137 @@ async function onScanSuccess(decodedText) {
   try {
 
     const response = await fetch(
-      WEB_APP_URL + "?id=" + encodeURIComponent(id)
+      WEB_APP_URL,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+
+        body: JSON.stringify({
+          id: id
+        }),
+
+        redirect: "follow"
+      }
     );
 
-    const html = await response.text();
 
-    // Παίρνουμε μόνο το ορατό κείμενο από την HTML του Apps Script
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-
-    const pageText =
-      doc.body.innerText || "";
-
-    let name = "";
-    let status = "";
-    let message = "";
-
-    // Προσπαθούμε να βρούμε το όνομα
-    const nameEl =
-      doc.querySelector(".name");
-
-    if (nameEl) {
-      name = nameEl.innerText.trim();
-    }
-
-    // Προσπαθούμε να βρούμε το status
-    const statusEl =
-      doc.querySelector(".status");
-
-    if (statusEl) {
-      status = statusEl.innerText.trim();
-    }
-
-    // Προσπαθούμε να βρούμε το μήνυμα
-    const messageEl =
-      doc.querySelector(".message");
-
-    if (messageEl) {
-      message = messageEl.innerText.trim();
+    if (!response.ok) {
+      throw new Error(
+        "HTTP " + response.status
+      );
     }
 
 
-    if (!name && !status) {
+    const data = await response.json();
+
+
+    if (!data.ok) {
+
       result.className = "error";
-      result.innerHTML =
-        "❌ Δεν μπόρεσα να διαβάσω τα στοιχεία του μαθητή.";
-    } else {
+
+      if (data.error === "UNKNOWN_ID") {
+
+        result.innerHTML =
+          "❌ Άγνωστο QR<br><br>" +
+          "ID: " + id;
+
+      } else {
+
+        result.innerHTML =
+          "❌ Σφάλμα συστήματος";
+
+      }
+
+    }
+
+    else {
 
       let cssClass = "neutral";
 
-      const s =
-        status.toUpperCase();
+      const status =
+        String(data.status || "")
+          .trim()
+          .toUpperCase();
 
-      if (s === "ΕΝΕΡΓΟΣ") {
+
+      if (status === "ΕΝΕΡΓΟΣ") {
+
         cssClass = "active";
+
       }
-      else if (s === "ΛΗΓΕΙ ΣΥΝΤΟΜΑ") {
+
+      else if (
+        status === "ΛΗΓΕΙ ΣΥΝΤΟΜΑ"
+      ) {
+
         cssClass = "warning";
+
       }
-      else if (s === "ΕΛΗΞΕ") {
+
+      else if (status === "ΕΛΗΞΕ") {
+
         cssClass = "expired";
+
       }
+
 
       result.className = cssClass;
 
+
+      let duplicateText = "";
+
+      if (data.duplicate) {
+
+        duplicateText =
+          "<div class='small'>" +
+          "ℹ️ Η παρουσία είχε ήδη καταγραφεί σήμερα." +
+          "</div>";
+
+      }
+
+
+      let expiryText = "";
+
+      if (data.expiry) {
+
+        expiryText =
+          "<div class='small'>" +
+          "Λήξη συνδρομής: " +
+          data.expiry +
+          "</div>";
+
+      }
+
+
       result.innerHTML =
-        "✅ " + (message || "Παρουσία καταγράφηκε") +
+        "✅ " + data.message +
         "<br><br>" +
-        name +
+        data.name +
         "<br><br>" +
-        status;
+        data.status +
+        expiryText +
+        duplicateText;
+
     }
 
   }
-  catch (err) {
+
+  catch (error) {
+
+    console.error(error);
 
     result.className = "error";
 
     result.innerHTML =
-      "❌ Σφάλμα σύνδεσης με το σύστημα.";
+      "❌ Σφάλμα σύνδεσης με το σύστημα";
 
   }
 
 
-  // Μετά από 3 δευτερόλεπτα ξανά ready
+  // Επιστροφή σε READY
   setTimeout(function() {
 
     result.className = "ready";
@@ -249,7 +303,10 @@ async function onScanSuccess(decodedText) {
 
 
 function onScanFailure(error) {
-  // Ο scanner συνεχίζει κανονικά.
+
+  // Δεν κάνουμε τίποτα.
+  // Η κάμερα παραμένει ενεργή.
+
 }
 
 
