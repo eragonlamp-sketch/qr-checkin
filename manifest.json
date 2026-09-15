@@ -1,0 +1,10 @@
+{
+  "name": "Wing Chun Academy QR Check-in",
+  "short_name": "QR Check-in",
+  "start_url": "/qr-checkin/",
+  "scope": "/qr-checkin/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "description": "Wing Chun Academy QR Check-in"
+}
