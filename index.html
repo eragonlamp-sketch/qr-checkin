@@ -30,64 +30,93 @@
       color: white;
       font-family: Arial, sans-serif;
       text-align: center;
+      overflow: hidden;
     }
 
     .container {
       width: 100%;
-      max-width: 520px;
-      margin: auto;
-      padding: 15px;
+      min-height: 100vh;
+      position: relative;
     }
 
-    h1,
-    .subtitle {
-      display: none;
+    /* SCANNER PANEL */
+
+    .scanner-panel {
+      width: 220px;
+      position: absolute;
+      top: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(15, 15, 15, 0.94);
+      border: 1px solid rgba(255,255,255,0.25);
     }
 
-    /* SCANNER */
     #reader {
       width: 220px;
-      margin: 0 auto;
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 16px;
+      height: 190px;
+      background: #000;
       overflow: hidden;
     }
 
     #reader video {
       width: 100% !important;
-      height: 190px !important;
+      height: 100% !important;
       object-fit: cover !important;
     }
 
-    /*
-      Κρατάμε ορατά:
-      - επιλογή κάμερας
-      - Stop Scanning
-      - υπόλοιπα controls
-    */
-    #reader__dashboard {
-      display: block !important;
-      padding: 4px 5px 6px !important;
-      background: white;
-      color: #222;
-      font-size: 11px !important;
+    /* ΔΙΚΑ ΜΑΣ CONTROLS */
+
+    .scanner-controls {
+      padding: 7px;
+      background: rgba(15,15,15,0.96);
     }
 
-    #reader__dashboard select,
-    #reader__dashboard button {
-      max-width: 200px;
-      font-size: 11px !important;
-      margin: 2px !important;
+    #cameraSelect {
+      width: 100%;
+      height: 28px;
+      margin-bottom: 6px;
+      border: 1px solid #555;
+      border-radius: 6px;
+      background: #222;
+      color: white;
+      font-size: 12px;
+      padding: 0 5px;
     }
 
-    /* ΑΠΟΤΕΛΕΣΜΑ */
+    #scanButton {
+      width: 100%;
+      height: 30px;
+      border: 1px solid #d71920;
+      border-radius: 6px;
+      background: #151515;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    #scanButton:active {
+      background: #d71920;
+    }
+
+    /* RESULT */
+
     #result {
-      margin-top: 15px;
+      position: absolute;
+      width: 400px;
+      left: 50%;
+      bottom: 105px;
+      transform: translateX(-50%);
+
       min-height: 48px;
       padding: 10px;
+
       border-radius: 16px;
+
       font-size: 17px;
       font-weight: bold;
+
       background: #222;
     }
 
@@ -126,76 +155,91 @@
       font-weight: normal;
     }
 
-    /* GALAXY TAB A11 - LANDSCAPE */
-    @media (orientation: landscape) {
 
-      .container {
-        position: relative;
-        width: 100vw;
-        max-width: none;
-        height: 100vh;
-        margin: 0;
-        padding: 0;
+    /* PORTRAIT */
+
+    @media (orientation: portrait) {
+
+      body {
+        overflow: auto;
       }
 
-      #reader {
-        position: absolute;
-        top: 22px;
-        left: 50%;
-        transform: translateX(-50%);
-        margin: 0;
+      .scanner-panel {
+        top: 20px;
       }
 
       #result {
-        position: absolute;
-        width: 400px;
-        left: 50%;
-        bottom: 105px;
-        transform: translateX(-50%);
-        margin: 0;
+        width: calc(100% - 40px);
+        bottom: 150px;
       }
     }
 
   </style>
 </head>
 
+
 <body>
 
-  <div class="container">
+<div class="container">
 
-    <h1>📷 QR CHECK-IN</h1>
-
-    <div class="subtitle">
-      Δείξε το προσωπικό σου QR στην κάμερα
-    </div>
+  <div class="scanner-panel">
 
     <div id="reader"></div>
 
-    <div id="result" class="ready">
-      Έτοιμο για σκανάρισμα
+    <div class="scanner-controls">
+
+      <select id="cameraSelect">
+        <option>Φόρτωση καμερών...</option>
+      </select>
+
+      <button id="scanButton">
+        Stop Scanning
+      </button>
+
     </div>
 
   </div>
 
 
+  <div id="result" class="ready">
+    Έτοιμο για σκανάρισμα
+  </div>
+
+</div>
+
+
 <script>
 
 const WEB_APP_URL =
-  "https://script.google.com/macros/s/AKfycbzYyKLJny_LTBuM6W048O1KdF064-XxBfKzsmgSj3akPj8exZIMWOMYs-rzk2_siq3t/exec";
+"https://script.google.com/macros/s/AKfycbzYyKLJny_LTBuM6W048O1KdF064-XxBfKzsmgSj3akPj8exZIMWOMYs-rzk2_siq3t/exec";
+
 
 let busy = false;
 let lastCode = "";
 let lastScanTime = 0;
 
+let scanning = false;
+
+let cameras = [];
+
+let currentCameraId = null;
+
+const html5QrCode =
+  new Html5Qrcode("reader");
+
+
 
 async function onScanSuccess(decodedText) {
 
   const id = decodedText.trim();
+
   const now = Date.now();
+
 
   if (!id) {
     return;
   }
+
 
   if (
     id === lastCode &&
@@ -204,60 +248,83 @@ async function onScanSuccess(decodedText) {
     return;
   }
 
+
   if (busy) {
     return;
   }
 
+
   busy = true;
+
   lastCode = id;
+
   lastScanTime = now;
+
 
   const result =
     document.getElementById("result");
 
+
   result.className = "ready";
-  result.innerHTML = "⏳ Καταγραφή παρουσίας...";
+
+  result.innerHTML =
+    "⏳ Καταγραφή παρουσίας...";
 
 
   try {
 
-    const response = await fetch(
-      WEB_APP_URL,
-      {
-        method: "POST",
+    const response =
+      await fetch(
 
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8"
-        },
+        WEB_APP_URL,
 
-        body: JSON.stringify({
-          id: id
-        }),
+        {
+          method: "POST",
 
-        redirect: "follow"
-      }
-    );
+          headers: {
+            "Content-Type":
+              "text/plain;charset=utf-8"
+          },
+
+          body: JSON.stringify({
+            id: id
+          }),
+
+          redirect: "follow"
+        }
+
+      );
 
 
     if (!response.ok) {
-      throw new Error("HTTP " + response.status);
+
+      throw new Error(
+        "HTTP " + response.status
+      );
+
     }
 
 
-    const data = await response.json();
+    const data =
+      await response.json();
 
 
     if (!data.ok) {
 
       result.className = "error";
 
-      if (data.error === "UNKNOWN_ID") {
+
+      if (
+        data.error === "UNKNOWN_ID"
+      ) {
 
         result.innerHTML =
           "❌ Άγνωστο QR<br><br>" +
           "ID: " + id;
 
-      } else {
+      }
+
+      else {
 
         result.innerHTML =
           "❌ Σφάλμα συστήματος";
@@ -266,9 +333,12 @@ async function onScanSuccess(decodedText) {
 
     }
 
+
     else {
 
-      let cssClass = "neutral";
+      let cssClass =
+        "neutral";
+
 
       const status =
         String(data.status || "")
@@ -276,29 +346,43 @@ async function onScanSuccess(decodedText) {
           .toUpperCase();
 
 
-      if (status === "ΕΝΕΡΓΟΣ") {
+      if (
+        status === "ΕΝΕΡΓΟΣ"
+      ) {
 
-        cssClass = "active";
-
-      }
-
-      else if (status === "ΛΗΓΕΙ ΣΥΝΤΟΜΑ") {
-
-        cssClass = "warning";
-
-      }
-
-      else if (status === "ΕΛΗΞΕ") {
-
-        cssClass = "expired";
+        cssClass =
+          "active";
 
       }
 
 
-      result.className = cssClass;
+      else if (
+        status ===
+        "ΛΗΓΕΙ ΣΥΝΤΟΜΑ"
+      ) {
+
+        cssClass =
+          "warning";
+
+      }
+
+
+      else if (
+        status === "ΕΛΗΞΕ"
+      ) {
+
+        cssClass =
+          "expired";
+
+      }
+
+
+      result.className =
+        cssClass;
 
 
       let duplicateText = "";
+
 
       if (data.duplicate) {
 
@@ -312,6 +396,7 @@ async function onScanSuccess(decodedText) {
 
       let expiryText = "";
 
+
       if (data.expiry) {
 
         expiryText =
@@ -324,23 +409,32 @@ async function onScanSuccess(decodedText) {
 
 
       result.innerHTML =
-        "✅ " + data.message +
+        "✅ " +
+        data.message +
         "<br><br>" +
+
         data.name +
         "<br><br>" +
+
         data.status +
+
         expiryText +
+
         duplicateText;
 
     }
 
   }
 
+
   catch (error) {
 
     console.error(error);
 
-    result.className = "error";
+
+    result.className =
+      "error";
+
 
     result.innerHTML =
       "❌ Σφάλμα σύνδεσης με το σύστημα";
@@ -350,10 +444,13 @@ async function onScanSuccess(decodedText) {
 
   setTimeout(function() {
 
-    result.className = "ready";
+    result.className =
+      "ready";
+
 
     result.innerHTML =
       "Έτοιμο για σκανάρισμα";
+
 
     busy = false;
 
@@ -365,38 +462,272 @@ async function onScanSuccess(decodedText) {
 
 function onScanFailure(error) {
 
-  // Η κάμερα παραμένει ενεργή.
+  /* Η κάμερα συνεχίζει */
 
 }
 
 
 
-const scanner =
-  new Html5QrcodeScanner(
+async function startScanner(cameraId) {
 
-    "reader",
+  try {
 
-    {
-      fps: 10,
+    if (scanning) {
 
-      qrbox: {
-        width: 170,
-        height: 170
+      await html5QrCode.stop();
+
+      scanning = false;
+
+    }
+
+
+    currentCameraId =
+      cameraId;
+
+
+    await html5QrCode.start(
+
+      cameraId,
+
+      {
+
+        fps: 10,
+
+        qrbox: {
+          width: 150,
+          height: 150
+        },
+
+        aspectRatio: 1
+
       },
 
-      rememberLastUsedCamera: true,
+      onScanSuccess,
 
-      aspectRatio: 1
-    },
+      onScanFailure
 
-    false
+    );
 
+
+    scanning = true;
+
+
+    document
+      .getElementById("scanButton")
+      .textContent =
+      "Stop Scanning";
+
+  }
+
+
+  catch (error) {
+
+    console.error(error);
+
+    document
+      .getElementById("result")
+      .innerHTML =
+      "❌ Δεν ήταν δυνατή η εκκίνηση της κάμερας";
+
+  }
+
+}
+
+
+
+async function stopScanner() {
+
+  if (!scanning) {
+    return;
+  }
+
+
+  try {
+
+    await html5QrCode.stop();
+
+    scanning = false;
+
+
+    document
+      .getElementById("scanButton")
+      .textContent =
+      "Start Scanning";
+
+  }
+
+
+  catch (error) {
+
+    console.error(error);
+
+  }
+
+}
+
+
+
+async function loadCameras() {
+
+  try {
+
+    cameras =
+      await Html5Qrcode.getCameras();
+
+
+    const select =
+      document.getElementById(
+        "cameraSelect"
+      );
+
+
+    select.innerHTML = "";
+
+
+    cameras.forEach(function(camera) {
+
+      const option =
+        document.createElement(
+          "option"
+        );
+
+
+      option.value =
+        camera.id;
+
+
+      option.textContent =
+        camera.label ||
+        "Camera";
+
+
+      select.appendChild(
+        option
+      );
+
+    });
+
+
+    if (
+      cameras.length === 0
+    ) {
+
+      document
+        .getElementById("result")
+        .innerHTML =
+        "❌ Δεν βρέθηκε κάμερα";
+
+      return;
+
+    }
+
+
+    /*
+      Προσπαθούμε να επιλέξουμε
+      την μπροστινή κάμερα.
+    */
+
+    let preferred =
+      cameras.find(function(camera) {
+
+        const name =
+          String(camera.label)
+            .toLowerCase();
+
+        return (
+          name.includes("front") ||
+          name.includes("user")
+        );
+
+      });
+
+
+    if (!preferred) {
+
+      preferred =
+        cameras[0];
+
+    }
+
+
+    currentCameraId =
+      preferred.id;
+
+
+    select.value =
+      preferred.id;
+
+
+    await startScanner(
+      preferred.id
+    );
+
+  }
+
+
+  catch (error) {
+
+    console.error(error);
+
+
+    document
+      .getElementById("result")
+      .innerHTML =
+      "❌ Δεν ήταν δυνατή η πρόσβαση στην κάμερα";
+
+  }
+
+}
+
+
+
+document
+  .getElementById("cameraSelect")
+  .addEventListener(
+    "change",
+    async function() {
+
+      await startScanner(
+        this.value
+      );
+
+    }
   );
 
 
-scanner.render(
-  onScanSuccess,
-  onScanFailure
+
+document
+  .getElementById("scanButton")
+  .addEventListener(
+    "click",
+    async function() {
+
+      if (scanning) {
+
+        await stopScanner();
+
+      }
+
+      else {
+
+        await startScanner(
+          currentCameraId
+        );
+
+      }
+
+    }
+  );
+
+
+
+window.addEventListener(
+  "load",
+  function() {
+
+    loadCameras();
+
+  }
 );
 
 </script>
@@ -406,18 +737,33 @@ scanner.render(
 
 if ("serviceWorker" in navigator) {
 
-  window.addEventListener("load", function() {
+  window.addEventListener(
+    "load",
+    function() {
 
-    navigator.serviceWorker
-      .register("./sw.js")
-      .then(function() {
-        console.log("Service Worker registered");
-      })
-      .catch(function(error) {
-        console.log("Service Worker registration failed:", error);
-      });
+      navigator
+        .serviceWorker
+        .register("./sw.js")
 
-  });
+        .then(function() {
+
+          console.log(
+            "Service Worker registered"
+          );
+
+        })
+
+        .catch(function(error) {
+
+          console.log(
+            "Service Worker registration failed:",
+            error
+          );
+
+        });
+
+    }
+  );
 
 }
 
