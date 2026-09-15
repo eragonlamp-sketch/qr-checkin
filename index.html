@@ -7,6 +7,10 @@
 
   <title>QR Check-in</title>
 
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111111">
+  <meta name="mobile-web-app-capable" content="yes">
+
   <script src="https://unpkg.com/html5-qrcode"></script>
 
   <style>
@@ -25,9 +29,9 @@
 
     .container {
       width: 100%;
-    max-width: 520px;
-    margin: auto;
-    padding: 15px;
+      max-width: 520px;
+      margin: auto;
+      padding: 15px;
     }
 
     h1 {
@@ -35,16 +39,16 @@
     }
 
     .subtitle {
-    display: none;
+      display: none;
     }
 
     #reader {
-       width: 100%;
-    max-width: 320px;
-    margin: 0 auto;
-    background: white;
-    border-radius: 14px;
-    overflow: hidden;
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
     }
 
     #result {
@@ -340,6 +344,26 @@ scanner.render(
   onScanFailure
 );
 
+</script>
+
+
+<script>
+if ("serviceWorker" in navigator) {
+
+  window.addEventListener("load", function() {
+
+    navigator.serviceWorker
+      .register("./sw.js")
+      .then(function() {
+        console.log("Service Worker registered");
+      })
+      .catch(function(error) {
+        console.log("Service Worker registration failed:", error);
+      });
+
+  });
+
+}
 </script>
 
 </body>
