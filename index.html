@@ -42,15 +42,28 @@
       display: none;
     }
 
+    /* ΚΑΜΕΡΑ */
     #reader {
-      width: 100%;
-      max-width: 240px;
+      width: 220px;
+      height: 220px;
       margin: 0 auto;
-      background: white;
-      border-radius: 14px;
+      background: #000;
+      border-radius: 18px;
       overflow: hidden;
     }
 
+    #reader video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+    }
+
+    /* Κρύβει camera selector + Stop Scanning */
+    #reader__dashboard {
+      display: none !important;
+    }
+
+    /* ΑΠΟΤΕΛΕΣΜΑ */
     #result {
       margin-top: 25px;
       min-height: 60px;
@@ -115,6 +128,7 @@
     </div>
 
   </div>
+
 
 <script>
 
@@ -325,13 +339,13 @@ const scanner =
       fps: 10,
 
       qrbox: {
-        width: 280,
-        height: 280
+        width: 180,
+        height: 180
       },
 
       rememberLastUsedCamera: true,
 
-      aspectRatio: 1.333
+      aspectRatio: 1
     },
 
     false
@@ -348,6 +362,7 @@ scanner.render(
 
 
 <script>
+
 if ("serviceWorker" in navigator) {
 
   window.addEventListener("load", function() {
@@ -364,6 +379,7 @@ if ("serviceWorker" in navigator) {
   });
 
 }
+
 </script>
 
 </body>
